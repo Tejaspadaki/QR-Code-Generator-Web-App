@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h2>Create QR Code</h2>
+
+<form method="POST" class="qr-form">
+  <input type="text" name="filename" placeholder="File name" required />
+
+  <select name="qr_type" id="qr_type" onchange="updateQRFields()">
+    <option value="url">URL</option>
+    <option value="whatsapp">WhatsApp</option>
+    <option value="location">Location</option>
+    <option value="vcard">vCard</option>
+  </select>
+
+  <div id="qr_fields">
+    <input type="text" name="url" placeholder="Enter URL" required />
+  </div>
+
+  <button type="submit">Generate</button>
+</form>
+
+{% if qr_img %}
+  <div class="preview">
+    <h3>Preview ({{ file_name }})</h3>
+    <img src="{{ qr_img }}" alt="Generated QR Code" id="qrPreview" />
+
+    <a id="downloadLink" class="btn download" download="{{ file_name }}.png">⬇️ Download</a>
+  </div>
+
+  <script>
+    const img = document.getElementById('qrPreview');
+    const downloadLink = document.getElementById('downloadLink');
+    downloadLink.href = img.src;
+  </script>
+{% endif %}
+
+<script>
+  function updateQRFields() {
+    const type = document.getElementById("qr_type").value;
+    const container = document.getElementById("qr_fields");
+    container.innerHTML = "";
+
+    if (type === "url") {
+      container.innerHTML = `<input type="text" name="url" placeholder="Enter URL" required />`;
+    } else if (type === "whatsapp") {
+      container.innerHTML = `<input type="text" name="phone" placeholder="WhatsApp Number (with country code)" required />
+                             <input type="text" name="message" placeholder="Message (optional)" />`;
+    } else if (type === "location") {
+      container.innerHTML = `<input type="text" name="latitude" placeholder="Latitude" required />
+                             <input type="text" name="longitude" placeholder="Longitude" required />`;
+    } else if (type === "vcard") {
+      container.innerHTML = `<input type="text" name="name" placeholder="Full Name" required />
+                             <input type="text" name="email" placeholder="Email" />
+                             <input type="text" name="phone" placeholder="Phone Number" />
+                             <input type="text" name="org" placeholder="Organization" />`;
+    }
+  }
+</script>
+
+{% endblock %}

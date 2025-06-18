@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block head %}
+  <title>QR Code Scanner</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='scanner.css') }}">
+  <script src="https://unpkg.com/html5-qrcode"></script>
+{% endblock %}
+
+{% block content %}
+
+
+<main>
+  <div id="reader" style="width: 100%; max-width: 400px; margin: auto;"></div>
+  <div id="scan-result" style="text-align: center; margin-top: 1rem; font-weight: bold;"></div>
+</main>
+
+<script>
+  const resultContainer = document.getElementById('scan-result');
+
+  function onScanSuccess(decodedText, decodedResult) {
+    resultContainer.innerText = `Scanned: ${decodedText}`;
+    html5QrcodeScanner.clear(); // Optional: stop scanning after success
+  }
+
+  const html5QrcodeScanner = new Html5QrcodeScanner(
+    "reader", { fps: 10, qrbox: 250 }
+  );
+  html5QrcodeScanner.render(onScanSuccess);
+</script>
+
+{% endblock %}

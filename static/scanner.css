@@ -1,0 +1,83 @@
+/* QR Code Scanner Page Styles (Themed) */
+
+body {
+    font-family: 'Poppins', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    margin: 0;
+    padding: 0;
+    transition: background 0.4s ease, color 0.4s ease;
+  }
+  
+  /* Header */
+  header {
+    background-color: var(--accent-dark);
+    color: white;
+    padding: 1rem 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 1.2rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  }
+  
+  header a {
+    color: white;
+    text-decoration: none;
+    background: var(--accent);
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    transition: background 0.3s ease, box-shadow 0.3s ease;
+  }
+  
+  header a:hover {
+    background: var(--accent-dark);
+    box-shadow: 0 4px 12px rgba(0, 255, 255, 0.3);
+  }
+  
+  /* Main Scanner Area */
+  main {
+    max-width: 500px;
+    margin: 3rem auto;
+    padding: 2rem;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    text-align: center;
+    animation: fadeInUp 0.6s ease-in-out;
+    backdrop-filter: blur(10px);
+  }
+  
+  /* QR Scanner Reader Container */
+  #reader {
+    width: 100% !important;
+    border: 2px solid var(--accent);
+    border-radius: 12px;
+    padding: 0.5rem;
+    background: rgba(255, 255, 255, 0.3);
+    backdrop-filter: blur(6px);
+  }
+  
+  /* Scan Result Text */
+  #scan-result {
+    margin-top: 1.5rem;
+    font-size: 1.1rem;
+    color: var(--accent-dark);
+    font-weight: 600;
+    word-wrap: break-word;
+  }
+  
+  /* Animation */
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  

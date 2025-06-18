@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h2>Your QR Code History</h2>
+
+<div class="qr-grid">
+  {% for qr in records %}
+    <div class="qr-card">
+      <h4>{{ qr.file_name }}</h4>
+      <p>{{ qr.data or qr.url }}</p>
+
+      <img
+        src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={{ qr.data or qr.url }}"
+        alt="QR Code"
+        class="qr-image"
+      />
+
+      <div class="qr-actions">
+        <form action="{{ url_for('delete_qr', qr_id=qr._id) }}" method="POST">
+          <button type="submit" class="btn delete">🗑 Delete</button>
+        </form>
+
+        <form action="{{ url_for('download_qr', qr_id=qr._id) }}" method="GET">
+            <button type="submit" class="btn download">⬇️ Download</button>
+          </form>
+          
+      </div>
+    </div>
+  {% endfor %}
+</div>
+
+{% endblock %}
