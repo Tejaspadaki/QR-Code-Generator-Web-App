@@ -12,9 +12,10 @@ import os
 import csv
 import zipfile
 import pyshorteners
-from flask import send_file
 import io
 from dotenv import load_dotenv
+from wsgi_to_vercel import make_handler
+
 load_dotenv()
 
 # Setup
@@ -53,8 +54,6 @@ def shorten_url(url):
     except:
         return url
 
-# Routes
-
 @app.route("/register", methods=["GET", "POST"])
 def register():
     if request.method == "POST":
@@ -75,52 +74,43 @@ def register():
 @login_required
 def download_zip():
     records = list(qrcodes_collection.find({"user_id": ObjectId(current_user.id)}))
-    zip_path = os.path.join(app.config["UPLOAD_FOLDER"], f"{current_user.username}_qrcodes.zip")
+    zip_buffer = BytesIO()
 
-    with zipfile.ZipFile(zip_path, "w") as zipf:
+    with zipfile.ZipFile(zip_buffer, "w") as zipf:
         for qr in records:
-            data = qr.get("data") or qr.get("url")  # 👈 safely get the data field
+            data = qr.get("data") or qr.get("url")
             if not data:
-                continue  # skip if no data
-
+                continue
             qr_code = qrcode.make(data)
+            buffer = BytesIO()
+            qr_code.save(buffer, format="PNG")
             filename = f"{qr.get('file_name', 'QR')}.png"
-            img_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
-            qr_code.save(img_path)
-            zipf.write(img_path, arcname=filename)
-            os.remove(img_path)
+            zipf.writestr(filename, buffer.getvalue())
 
-    return send_file(zip_path, as_attachment=True)
+    zip_buffer.seek(0)
+    return send_file(zip_buffer, as_attachment=True, download_name=f"{current_user.username}_qrcodes.zip")
 
 @app.route("/download/<qr_id>")
 @login_required
 def download_qr(qr_id):
     qr = qrcodes_collection.find_one({"_id": ObjectId(qr_id), "user_id": ObjectId(current_user.id)})
-    
     if not qr:
         flash("QR Code not found", "danger")
         return redirect(url_for("history"))
 
     data = qr.get("data") or qr.get("url")
     filename = qr.get("file_name", "QR")
-
     qr_code = qrcode.make(data)
-    buffer = io.BytesIO()
+    buffer = BytesIO()
     qr_code.save(buffer, format="PNG")
     buffer.seek(0)
 
-    return send_file(
-        buffer,
-        mimetype="image/png",
-        as_attachment=True,
-        download_name=f"{filename}.png"
-    )
+    return send_file(buffer, mimetype="image/png", as_attachment=True, download_name=f"{filename}.png")
 
 @app.route("/scan")
 @login_required
 def scan():
     return render_template("scanner.html")
-
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -173,12 +163,7 @@ def index():
             flash("Missing data or filename", "warning")
             return redirect(url_for("index"))
 
-        qr = qrcode.QRCode(
-            version=1,
-            error_correction=qrcode.constants.ERROR_CORRECT_H,
-            box_size=10,
-            border=4,
-        )
+        qr = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_H, box_size=10, border=4)
         qr.add_data(data)
         qr.make(fit=True)
         img = qr.make_image(fill_color="black", back_color="white")
@@ -226,33 +211,23 @@ def bulk_upload():
             flash("Invalid file", "danger")
             return redirect(url_for("bulk_upload"))
 
-        file_path = os.path.join(app.config["UPLOAD_FOLDER"], secure_filename(file.filename))
-        file.save(file_path)
+        reader = csv.DictReader(file.read().decode("utf-8").splitlines())
+        for row in reader:
+            url = row.get("url", "")
+            file_name = row.get("filename", "QR")
+            if not url:
+                continue
+            short_url = shorten_url(url)
+            qrcodes_collection.insert_one({
+                "file_name": file_name,
+                "url": short_url,
+                "user_id": ObjectId(current_user.id),
+                "created_at": datetime.utcnow()
+            })
 
-        with open(file_path, newline='') as csvfile:
-            reader = csv.DictReader(csvfile)
-            for row in reader:
-                url = row.get("url", "")
-                file_name = row.get("filename", "QR")
-                if not url: continue
-
-                short_url = shorten_url(url)
-                qr = qrcode.make(short_url)
-                img_path = os.path.join(app.config["UPLOAD_FOLDER"], f"{file_name}.png")
-                qr.save(img_path)
-
-                qrcodes_collection.insert_one({
-                    "file_name": file_name,
-                    "url": short_url,
-                    "user_id": ObjectId(current_user.id),
-                    "created_at": datetime.utcnow()
-                })
         flash("Bulk QR generation done", "success")
         return redirect(url_for("history"))
     return render_template("bulk_upload.html")
 
-
-if __name__ == "__main__":
-    # Only run this in development, never in production
-    if not os.getenv("FLASK_ENV") == "production":
-        app.run(debug=True, host="0.0.0.0", port=5000)
+# Required for Vercel Serverless
+handler = make_handler(app)

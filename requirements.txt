@@ -1,7 +1,8 @@
-Flask
-Flask-Login
+flask
+flask-login
+flask-cors
 pymongo
-python-dotenv
 qrcode
+python-dotenv
 pyshorteners
-Werkzeug
+wsgi-to-vercel
