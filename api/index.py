@@ -14,7 +14,6 @@ import zipfile
 import pyshorteners
 import io
 from dotenv import load_dotenv
-from wsgi_to_vercel import make_handler
 
 load_dotenv()
 
@@ -228,6 +227,3 @@ def bulk_upload():
         flash("Bulk QR generation done", "success")
         return redirect(url_for("history"))
     return render_template("bulk_upload.html")
-
-# Required for Vercel Serverless
-handler = make_handler(app)
