@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: qr-code-generator
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    envVars:
+      - key: SECRET_KEY
+        value: your_secret_key
+      - key: MONGO_URI
+        value: your_mongodb_uri
+      - key: UPLOAD_FOLDER
+        value: uploads
