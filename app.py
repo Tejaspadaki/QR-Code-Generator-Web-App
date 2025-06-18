@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, redirect, url_for, flash, sen
 from flask_login import LoginManager, login_user, logout_user, login_required, UserMixin, current_user
 from pymongo import MongoClient
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
 from bson.objectid import ObjectId
 from datetime import datetime
 import qrcode
@@ -11,31 +12,23 @@ import os
 import csv
 import zipfile
 import pyshorteners
-from dotenv import load_dotenv
+import io
 
-load_dotenv()
-
-# Setup
 app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY")
-
-UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", "uploads")
+app.secret_key = "your_secret_key_here"
+UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
-app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024  # 10MB upload limit
 
-# Login
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = "login"
 
-# MongoDB
-client = MongoClient(os.getenv("MONGO_URI"))
+client = MongoClient("mongodb+srv://tejaspadaki255:tejas%401@cluster0.cpwl2.mongodb.net/qr_app?retryWrites=true&w=majority")
 db = client["qr_app"]
 users_collection = db["users"]
 qrcodes_collection = db["qrcodes"]
 
-# User class
 class User(UserMixin):
     def __init__(self, user_data):
         self.id = str(user_data["_id"])
@@ -46,7 +39,6 @@ def load_user(user_id):
     user_data = users_collection.find_one({"_id": ObjectId(user_id)})
     return User(user_data) if user_data else None
 
-# URL shortener
 def shorten_url(url):
     try:
         return pyshorteners.Shortener().tinyurl.short(url)
@@ -68,6 +60,53 @@ def register():
         flash("Registration successful", "success")
         return redirect(url_for("login"))
     return render_template("register.html")
+
+@app.route("/download_zip")
+@login_required
+def download_zip():
+    records = list(qrcodes_collection.find({"user_id": ObjectId(current_user.id)}))
+    zip_path = os.path.join(app.config["UPLOAD_FOLDER"], f"{current_user.username}_qrcodes.zip")
+
+    with zipfile.ZipFile(zip_path, "w") as zipf:
+        for qr in records:
+            data = qr.get("data") or qr.get("url")
+            if not data:
+                continue
+            qr_code = qrcode.make(data)
+            filename = f"{qr.get('file_name', 'QR')}.png"
+            img_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+            qr_code.save(img_path)
+            zipf.write(img_path, arcname=filename)
+            os.remove(img_path)
+
+    return send_file(zip_path, as_attachment=True)
+
+@app.route("/download/<qr_id>")
+@login_required
+def download_qr(qr_id):
+    qr = qrcodes_collection.find_one({"_id": ObjectId(qr_id), "user_id": ObjectId(current_user.id)})
+    if not qr:
+        flash("QR Code not found", "danger")
+        return redirect(url_for("history"))
+
+    data = qr.get("data") or qr.get("url")
+    filename = qr.get("file_name", "QR")
+    qr_code = qrcode.make(data)
+    buffer = BytesIO()
+    qr_code.save(buffer, format="PNG")
+    buffer.seek(0)
+
+    return send_file(
+        buffer,
+        mimetype="image/png",
+        as_attachment=True,
+        download_name=f"{filename}.png"
+    )
+
+@app.route("/scan")
+@login_required
+def scan():
+    return render_template("scanner.html")
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -94,10 +133,9 @@ def logout():
 def index():
     qr_img = None
     file_name = None
-
     if request.method == "POST":
         qr_type = request.form.get("qr_type")
-        file_name = request.form.get("filename", "").strip()
+        file_name = request.form.get("filename").strip()
         url = request.form.get("url", "").strip()
 
         if qr_type == "whatsapp":
@@ -120,7 +158,12 @@ def index():
             flash("Missing data or filename", "warning")
             return redirect(url_for("index"))
 
-        qr = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_H, box_size=10, border=4)
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_H,
+            box_size=10,
+            border=4,
+        )
         qr.add_data(data)
         qr.make(fit=True)
         img = qr.make_image(fill_color="black", back_color="white")
@@ -159,43 +202,6 @@ def delete_qr(qr_id):
         flash("Not found or access denied", "danger")
     return redirect(url_for("history"))
 
-@app.route("/download/<qr_id>")
-@login_required
-def download_qr(qr_id):
-    qr = qrcodes_collection.find_one({"_id": ObjectId(qr_id), "user_id": ObjectId(current_user.id)})
-    if not qr:
-        flash("QR Code not found", "danger")
-        return redirect(url_for("history"))
-
-    data = qr.get("data") or qr.get("url")
-    filename = qr.get("file_name", "QR")
-    qr_code = qrcode.make(data)
-    buffer = BytesIO()
-    qr_code.save(buffer, format="PNG")
-    buffer.seek(0)
-
-    return send_file(buffer, mimetype="image/png", as_attachment=True, download_name=f"{filename}.png")
-
-@app.route("/download_zip")
-@login_required
-def download_zip():
-    records = list(qrcodes_collection.find({"user_id": ObjectId(current_user.id)}))
-    zip_buffer = BytesIO()
-
-    with zipfile.ZipFile(zip_buffer, "w") as zipf:
-        for qr in records:
-            data = qr.get("data") or qr.get("url")
-            if not data:
-                continue
-            qr_code = qrcode.make(data)
-            buffer = BytesIO()
-            qr_code.save(buffer, format="PNG")
-            filename = f"{qr.get('file_name', 'QR')}.png"
-            zipf.writestr(filename, buffer.getvalue())
-
-    zip_buffer.seek(0)
-    return send_file(zip_buffer, as_attachment=True, download_name=f"{current_user.username}_qrcodes.zip")
-
 @app.route("/bulk_upload", methods=["GET", "POST"])
 @login_required
 def bulk_upload():
@@ -205,25 +211,31 @@ def bulk_upload():
             flash("Invalid file", "danger")
             return redirect(url_for("bulk_upload"))
 
-        reader = csv.DictReader(file.read().decode("utf-8").splitlines())
-        for row in reader:
-            url = row.get("url", "")
-            file_name = row.get("filename", "QR")
-            if not url:
-                continue
-            short_url = shorten_url(url)
-            qrcodes_collection.insert_one({
-                "file_name": file_name,
-                "url": short_url,
-                "user_id": ObjectId(current_user.id),
-                "created_at": datetime.utcnow()
-            })
+        file_path = os.path.join(app.config["UPLOAD_FOLDER"], secure_filename(file.filename))
+        file.save(file_path)
 
+        with open(file_path, newline='') as csvfile:
+            reader = csv.DictReader(csvfile)
+            for row in reader:
+                url = row.get("url", "")
+                file_name = row.get("filename", "QR")
+                if not url:
+                    continue
+
+                short_url = shorten_url(url)
+                qr = qrcode.make(short_url)
+                img_path = os.path.join(app.config["UPLOAD_FOLDER"], f"{file_name}.png")
+                qr.save(img_path)
+
+                qrcodes_collection.insert_one({
+                    "file_name": file_name,
+                    "url": short_url,
+                    "user_id": ObjectId(current_user.id),
+                    "created_at": datetime.utcnow()
+                })
         flash("Bulk QR generation done", "success")
         return redirect(url_for("history"))
     return render_template("bulk_upload.html")
 
-
-# Run in local development only
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    app.run(debug=True, port=5000)
