@@ -253,4 +253,6 @@ def bulk_upload():
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    # Only run this in development, never in production
+    if not os.getenv("FLASK_ENV") == "production":
+        app.run(debug=True, host="0.0.0.0", port=5000)
