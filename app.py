@@ -17,8 +17,8 @@ import io
 
 # Setup
 app = Flask(__name__)
-app.secret_key = "your_secret_key_here"
-UPLOAD_FOLDER = "uploads"
+app.secret_key = os.getenv("SECRET_KEY")
+UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", "uploads")
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
@@ -28,7 +28,7 @@ login_manager.init_app(app)
 login_manager.login_view = "login"
 
 # MongoDB
-client = MongoClient("mongodb+srv://tejaspadaki255:tejas%401@cluster0.cpwl2.mongodb.net/qr_app?retryWrites=true&w=majority")
+client = MongoClient(os.getenv("MONGO_URI"))
 db = client["qr_app"]
 users_collection = db["users"]
 qrcodes_collection = db["qrcodes"]
