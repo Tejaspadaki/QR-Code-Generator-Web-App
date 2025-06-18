@@ -14,6 +14,8 @@ import zipfile
 import pyshorteners
 from flask import send_file
 import io
+from dotenv import load_dotenv
+load_dotenv()
 
 # Setup
 app = Flask(__name__)
